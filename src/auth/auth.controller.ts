@@ -4,7 +4,15 @@ import { JwtGuard } from './jwt.guard';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) {
+    console.log('✅ AuthController loaded');
+  }
+
+  // 🔴 TEMP DEBUG ROUTE (browser-friendly)
+  @Get()
+  ping() {
+    return { auth: 'alive' };
+  }
 
   @Post('register')
   register(
