@@ -20,3 +20,16 @@ enum Role {
   RENTER
   ADMIN
 }
+
+model Vehicle {
+  id          String   @id @default(uuid())
+  hostId      String
+  make        String
+  model       String
+  year        Int
+  dailyPrice  Int
+  active      Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  host User @relation(fields: [hostId], references: [id])
+}
