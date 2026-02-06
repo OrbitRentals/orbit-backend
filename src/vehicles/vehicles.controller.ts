@@ -7,9 +7,12 @@ import {
   Body,
   UseGuards,
   Req,
+  UnauthorizedException,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { JwtAuthGuard } from '../auth/jwt.guard';
+import { JwtGuard } from '../auth/jwt.guard';
+import { Request } from 'express';
 
 @Controller('vehicles')
 export class VehiclesController {
@@ -25,34 +28,58 @@ export class VehiclesController {
   }
 
   // 🔐 Add vehicle
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtGuard)
   @Post()
-  async create(@Req() req, @Body() body) {
-    if (req.user.role !== 'HOST' && req.user.role !== 'ADMIN') {
-      throw new Error('Unauthorized');
+  async create(
+    @Req() req: Request,
+    @Body()
+    body: {
+      make: string;
+      model: string;
+      year: number;
+      dailyPrice: number;
+      imageUrl?: string;
+    },
+  ) {
+    const user = (req as any).user;
+
+    if (user.role !== 'HOST' && user.role !== 'ADMIN') {
+      throw new UnauthorizedException();
     }
 
     return this.prisma.vehicle.create({
       data: {
-        hostId: req.user.sub,
+        hostId: user.sub,
         make: body.make,
         model: body.model,
         year: Number(body.year),
         dailyPrice: Number(body.dailyPrice),
-        imageUrl: body.imageUrl || null,
+        imageUrl: body.imageUrl ?? null,
+        active: true,
       },
     });
   }
 
   // 🔐 Toggle active / inactive
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtGuard)
   @Patch(':id/toggle')
-  async toggle(@Param('id') id: string, @Req() req) {
-    if (req.user.role !== 'HOST' && req.user.role !== 'ADMIN') {
-      throw new Error('Unauthorized');
+  async toggle(
+    @Param('id') id: string,
+    @Req() req: Request,
+  ) {
+    const user = (req as any).user;
+
+    if (user.role !== 'HOST' && user.role !== 'ADMIN') {
+      throw new UnauthorizedException();
     }
 
-    const vehicle = await this.prisma.vehicle.findUnique({ where: { id } });
+    const vehicle = await this.prisma.vehicle.findUnique({
+      where: { id },
+    });
+
+    if (!vehicle) {
+      throw new NotFoundException('Vehicle not found');
+    }
 
     return this.prisma.vehicle.update({
       where: { id },
