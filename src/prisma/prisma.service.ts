@@ -10,12 +10,6 @@ export class PrismaService
     await this.$connect();
   }
 
-  async enableShutdownHooks() {
-    this.$on('beforeExit', async () => {
-      await this.$disconnect();
-    });
-  }
-
   async onModuleDestroy() {
     await this.$disconnect();
   }
