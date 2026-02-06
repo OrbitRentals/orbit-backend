@@ -73,17 +73,15 @@ export class VehiclesController {
       throw new UnauthorizedException();
     }
 
-    const vehicle = await this.prisma.vehicle.findUnique({
-      where: { id },
-    });
+const vehicle = await this.prisma.vehicle.findUnique({ where: { id } });
 
-    if (!vehicle) {
-      throw new NotFoundException('Vehicle not found');
-    }
+if (!vehicle) {
+  throw new Error('Vehicle not found');
+}
 
-    return this.prisma.vehicle.update({
-      where: { id },
-      data: { active: !vehicle.active },
-    });
+return this.prisma.vehicle.update({
+  where: { id },
+  data: { active: !vehicle.active },
+});
   }
 }
