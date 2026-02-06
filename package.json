@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "node node_modules/typescript/bin/tsc && npx prisma generate",
+    "build": "node node_modules/typescript/bin/tsc && node node_modules/prisma/build/index.js generate",
     "start": "node dist/main.js"
   },
   "dependencies": {
@@ -13,6 +13,7 @@
     "@nestjs/passport": "^10.0.3",
     "@nestjs/platform-express": "^10.4.22",
     "@prisma/client": "^5.22.0",
+    "prisma": "^5.22.0",
     "bcryptjs": "^3.0.3",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
