@@ -8,28 +8,32 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
+  id           String    @id @default(uuid())
+  email        String    @unique
   passwordHash String
-  role         Role     @default(RENTER)
-  createdAt    DateTime @default(now())
+  role         Role      @default(RENTER)
+  createdAt    DateTime  @default(now())
+
+  vehicles     Vehicle[] // relation back to vehicles
+}
+
+model Vehicle {
+  id         String   @id @default(uuid())
+  hostId     String
+  make       String
+  model      String
+  year       Int
+  dailyPrice Int
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  host User @relation(fields: [hostId], references: [id])
+
+  @@index([hostId])
 }
 
 enum Role {
   HOST
   RENTER
   ADMIN
-}
-
-model Vehicle {
-  id          String   @id @default(uuid())
-  hostId      String
-  make        String
-  model       String
-  year        Int
-  dailyPrice  Int
-  active      Boolean  @default(true)
-  createdAt  DateTime @default(now())
-
-  host User @relation(fields: [hostId], references: [id])
 }
