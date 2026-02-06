@@ -1,28 +1,56 @@
-import { Injectable } from '@nestjs/common';
-import * as bcrypt from 'bcryptjs';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import * as crypto from 'crypto';
+import { PrismaService } from '../prisma/prisma.service';
+import * as bcrypt from 'bcryptjs';
 
 @Injectable()
 export class AuthService {
-  private users: any[] = [];
+  constructor(
+    private prisma: PrismaService,
+    private jwt: JwtService
+  ) {}
 
-  constructor(private jwt: JwtService) {}
-
-  async register(email: string, password: string, role = 'RENTER') {
+  async register(email: string, password: string) {
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = { id: crypto.randomUUID(), email, passwordHash, role };
-    this.users.push(user);
-    return { id: user.id, email: user.email, role: user.role };
+
+    const user = await this.prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        role: 'HOST'
+      }
+    });
+
+    return this.signToken(user.id, user.email, user.role);
   }
 
   async login(email: string, password: string) {
-    const user = this.users.find(u => u.email === email);
-    if (!user) throw new Error('Invalid credentials');
-    const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) throw new Error('Invalid credentials');
+    const user = await this.prisma.user.findUnique({
+      where: { email }
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const valid = await bcrypt.compare(password, user.passwordHash);
+
+    if (!valid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    return this.signToken(user.id, user.email, user.role);
+  }
+
+  private async signToken(
+    userId: string,
+    email: string,
+    role: string
+  ) {
+    const payload = { sub: userId, email, role };
+
     return {
-      access_token: this.jwt.sign({ sub: user.id, email: user.email, role: user.role })
+      access_token: await this.jwt.signAsync(payload)
     };
   }
 }
