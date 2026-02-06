@@ -25,6 +25,7 @@ model Vehicle {
   year       Int
   dailyPrice Int
   active     Boolean  @default(true)
+  imageUrl String?
   createdAt  DateTime @default(now())
 
   host User @relation(fields: [hostId], references: [id])
