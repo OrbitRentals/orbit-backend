@@ -2,6 +2,8 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
+  Param,
   Body,
   UseGuards,
   Req,
@@ -13,7 +15,7 @@ import { JwtAuthGuard } from '../auth/jwt.guard';
 export class VehiclesController {
   constructor(private prisma: PrismaService) {}
 
-  // 🌍 Public list
+  // 🌍 Public list (active only)
   @Get()
   async list() {
     return this.prisma.vehicle.findMany({
@@ -22,7 +24,7 @@ export class VehiclesController {
     });
   }
 
-  // 🔐 Admin / Host add
+  // 🔐 Add vehicle
   @UseGuards(JwtAuthGuard)
   @Post()
   async create(@Req() req, @Body() body) {
@@ -38,6 +40,22 @@ export class VehiclesController {
         year: Number(body.year),
         dailyPrice: Number(body.dailyPrice),
       },
+    });
+  }
+
+  // 🔐 Toggle active / inactive
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/toggle')
+  async toggle(@Param('id') id: string, @Req() req) {
+    if (req.user.role !== 'HOST' && req.user.role !== 'ADMIN') {
+      throw new Error('Unauthorized');
+    }
+
+    const vehicle = await this.prisma.vehicle.findUnique({ where: { id } });
+
+    return this.prisma.vehicle.update({
+      where: { id },
+      data: { active: !vehicle.active },
     });
   }
 }
