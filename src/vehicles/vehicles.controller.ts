@@ -39,6 +39,7 @@ export class VehiclesController {
         model: body.model,
         year: Number(body.year),
         dailyPrice: Number(body.dailyPrice),
+        imageUrl: body.imageUrl || null,
       },
     });
   }
