@@ -4,26 +4,16 @@ import { JwtGuard } from './jwt.guard';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {
-    console.log('✅ AuthController loaded');
-  }
+  constructor(private readonly authService: AuthService) {}
 
-  // 🔴 TEMP DEBUG ROUTE (browser-friendly)
   @Get()
   ping() {
     return { auth: 'alive' };
   }
 
   @Post('register')
-  register(
-    @Body()
-    body: { email: string; password: string; role?: string }
-  ) {
-    return this.authService.register(
-      body.email,
-      body.password,
-      body.role as any
-    );
+  register(@Body() body: { email: string; password: string; role?: string }) {
+    return this.authService.register(body.email, body.password, body.role as any);
   }
 
   @Post('login')
