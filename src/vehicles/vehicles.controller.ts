@@ -19,18 +19,18 @@ export class VehiclesController {
   constructor(private prisma: PrismaService) {}
 
   // 🌍 Public list (active vehicles only)
-  @Get()
-  async list() {
-    return this.prisma.vehicle.findMany({
-      where: { active: true },
-      include: {
-        images: {
-          orderBy: { order: 'asc' },
-        },
+@Get()
+async list() {
+  return this.prisma.vehicle.findMany({
+    where: { active: true },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      images: {
+        orderBy: { order: 'asc' },
       },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
+    },
+  });
+}
 
   // 🔐 Add vehicle (HOST / ADMIN only — NO images here)
   @UseGuards(JwtGuard)
