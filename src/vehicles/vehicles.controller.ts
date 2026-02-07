@@ -27,7 +27,7 @@ export class VehiclesController {
     });
   }
 
-  // 🔐 Add vehicle
+  // 🔐 Add vehicle (HOST / ADMIN only)
   @UseGuards(JwtGuard)
   @Post()
   async create(
@@ -60,7 +60,7 @@ export class VehiclesController {
     });
   }
 
-  // 🔐 Toggle active / inactive
+  // 🔐 Toggle active / inactive (HOST / ADMIN only)
   @UseGuards(JwtGuard)
   @Patch(':id/toggle')
   async toggle(
@@ -73,15 +73,17 @@ export class VehiclesController {
       throw new UnauthorizedException();
     }
 
-const vehicle = await this.prisma.vehicle.findUnique({ where: { id } });
+    const vehicle = await this.prisma.vehicle.findUnique({
+      where: { id },
+    });
 
-if (!vehicle) {
-  throw new Error('Vehicle not found');
-}
+    if (!vehicle) {
+      throw new NotFoundException('Vehicle not found');
+    }
 
-return this.prisma.vehicle.update({
-  where: { id },
-  data: { active: !vehicle.active },
-});
+    return this.prisma.vehicle.update({
+      where: { id },
+      data: { active: !vehicle.active },
+    });
   }
 }

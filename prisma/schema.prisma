@@ -26,6 +26,7 @@ model Vehicle {
   dailyPrice Int
   active     Boolean  @default(true)
   imageUrl String?
+  images VehicleImage[]
   createdAt  DateTime @default(now())
 
   host User @relation(fields: [hostId], references: [id])
@@ -38,3 +39,16 @@ enum Role {
   RENTER
   ADMIN
 }
+model VehicleImage {
+  id        String   @id @default(uuid())
+  vehicleId String
+  url       String
+  isMain    Boolean  @default(false)
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
+}
+
