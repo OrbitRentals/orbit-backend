@@ -8,17 +8,19 @@ datasource db {
 }
 
 model User {
-  id                String    @id @default(uuid())
-  email             String    @unique
+  id                String   @id @default(uuid())
+  email             String   @unique
   passwordHash      String
-  role              Role      @default(RENTER)
-  emailVerified     Boolean   @default(false)
-  verificationToken String?
-  createdAt         DateTime  @default(now())
+  role              Role     @default(RENTER)
+
+  // 🔐 EMAIL VERIFICATION
+  emailVerified     Boolean  @default(false)
+  verificationToken String?  @unique
+
+  createdAt         DateTime @default(now())
 
   vehicles          Vehicle[]
 }
-
 
 model Vehicle {
   id          String         @id @default(uuid())
