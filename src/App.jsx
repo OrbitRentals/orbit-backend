@@ -1,3 +1,4 @@
+import VerifyEmail from "./VerifyEmail";
 import { useState, useEffect } from "react";
 import { api } from "./api";
 import Admin from "./Admin";
