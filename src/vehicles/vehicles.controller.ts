@@ -19,9 +19,20 @@ import { Request } from 'express';
 export class VehiclesController {
   constructor(private prisma: PrismaService) {}
 
-  // 🌍 Public list
+  // 🌍 LIST VEHICLES
+  // - Admin / Host: all vehicles
+  // - Public: active only
   @Get()
-  async list() {
+  async list(@Req() req: any) {
+    const user = req?.user;
+
+    if (user && ['HOST', 'ADMIN'].includes(user.role)) {
+      return this.prisma.vehicle.findMany({
+        include: { images: true },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
     return this.prisma.vehicle.findMany({
       where: { active: true },
       include: { images: true },
@@ -29,7 +40,7 @@ export class VehiclesController {
     });
   }
 
-  // ➕ Create vehicle
+  // ➕ CREATE VEHICLE
   @UseGuards(JwtGuard)
   @Post()
   async create(
@@ -40,7 +51,7 @@ export class VehiclesController {
       model: string;
       year: number;
       dailyPrice: number;
-      description: string;
+      description?: string;
     },
   ) {
     const user = (req as any).user;
@@ -56,18 +67,26 @@ export class VehiclesController {
         model: body.model,
         year: Number(body.year),
         dailyPrice: Number(body.dailyPrice),
-        description: body.description,
+        description: body.description ?? '',
+        active: true,
       },
     });
   }
 
-  // ✏️ Edit vehicle
+  // ✏️ UPDATE VEHICLE
   @UseGuards(JwtGuard)
   @Patch(':id')
   async update(
     @Param('id') id: string,
     @Req() req: Request,
-    @Body() body: any,
+    @Body()
+    body: {
+      make?: string;
+      model?: string;
+      year?: number;
+      dailyPrice?: number;
+      description?: string;
+    },
   ) {
     const user = (req as any).user;
 
@@ -76,21 +95,46 @@ export class VehiclesController {
     }
 
     const vehicle = await this.prisma.vehicle.findUnique({ where: { id } });
-    if (!vehicle) throw new NotFoundException('Vehicle not found');
+    if (!vehicle) {
+      throw new NotFoundException('Vehicle not found');
+    }
 
     return this.prisma.vehicle.update({
       where: { id },
       data: {
-        make: body.make,
-        model: body.model,
-        year: Number(body.year),
-        dailyPrice: Number(body.dailyPrice),
-        description: body.description,
+        make: body.make ?? vehicle.make,
+        model: body.model ?? vehicle.model,
+        year: body.year ? Number(body.year) : vehicle.year,
+        dailyPrice: body.dailyPrice
+          ? Number(body.dailyPrice)
+          : vehicle.dailyPrice,
+        description: body.description ?? vehicle.description,
       },
     });
   }
 
-  // 🗑 Delete vehicle
+  // 🔁 TOGGLE ACTIVE / INACTIVE
+  @UseGuards(JwtGuard)
+  @Patch(':id/toggle')
+  async toggle(@Param('id') id: string, @Req() req: Request) {
+    const user = (req as any).user;
+
+    if (!['HOST', 'ADMIN'].includes(user.role)) {
+      throw new UnauthorizedException();
+    }
+
+    const vehicle = await this.prisma.vehicle.findUnique({ where: { id } });
+    if (!vehicle) {
+      throw new NotFoundException('Vehicle not found');
+    }
+
+    return this.prisma.vehicle.update({
+      where: { id },
+      data: { active: !vehicle.active },
+    });
+  }
+
+  // 🗑 DELETE VEHICLE
   @UseGuards(JwtGuard)
   @Delete(':id')
   async remove(@Param('id') id: string, @Req() req: Request) {
@@ -102,24 +146,5 @@ export class VehiclesController {
 
     await this.prisma.vehicle.delete({ where: { id } });
     return { success: true };
-  }
-
-  // 🔁 Toggle active
-  @UseGuards(JwtGuard)
-  @Patch(':id/toggle')
-  async toggle(@Param('id') id: string, @Req() req: Request) {
-    const user = (req as any).user;
-
-    if (!['HOST', 'ADMIN'].includes(user.role)) {
-      throw new UnauthorizedException();
-    }
-
-    const vehicle = await this.prisma.vehicle.findUnique({ where: { id } });
-    if (!vehicle) throw new NotFoundException();
-
-    return this.prisma.vehicle.update({
-      where: { id },
-      data: { active: !vehicle.active },
-    });
   }
 }
