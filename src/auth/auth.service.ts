@@ -11,7 +11,7 @@ export class AuthService {
     private jwt: JwtService,
   ) {}
 
-  // 📝 REGISTER (RENTER + EMAIL VERIFICATION REQUIRED)
+  // 📝 REGISTER (email verification required)
   async register(email: string, password: string) {
     const existing = await this.prisma.user.findUnique({
       where: { email },
@@ -24,28 +24,25 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(password, 10);
     const verificationToken = randomUUID();
 
-    const user = await this.prisma.user.create({
+    await this.prisma.user.create({
       data: {
         email,
         passwordHash,
-        role: 'RENTER',           // ✅ ALWAYS RENTER
-        emailVerified: false,     // ❌ NOT VERIFIED YET
+        role: 'RENTER',
+        emailVerified: false,
         verificationToken,
       },
     });
 
-    // TODO: send email here (next step)
-    console.log(
-      `VERIFY EMAIL: https://orbitrentals.net/verify-email?token=${verificationToken}`
-    );
+    // 🔗 TODO: send email (next step)
+    console.log(`VERIFY LINK: https://orbitrentals.net/verify?token=${verificationToken}`);
 
     return {
-      success: true,
-      message: 'Registration successful. Please verify your email.',
+      message: 'Registration successful. Please check your email to verify your account.',
     };
   }
 
-  // 🔐 LOGIN (BLOCKS UNVERIFIED USERS)
+  // 🔑 LOGIN (blocked if not verified)
   async login(email: string, password: string) {
     const user = await this.prisma.user.findUnique({
       where: { email },
@@ -56,10 +53,11 @@ export class AuthService {
     }
 
     if (!user.emailVerified) {
-      throw new UnauthorizedException('Please verify your email first');
+      throw new UnauthorizedException('Email not verified');
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
+
     if (!valid) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -67,14 +65,14 @@ export class AuthService {
     return this.signToken(user.id, user.email, user.role);
   }
 
-  // 📩 EMAIL VERIFY
+  // ✅ VERIFY EMAIL
   async verifyEmail(token: string) {
-    const user = await this.prisma.user.findFirst({
+    const user = await this.prisma.user.findUnique({
       where: { verificationToken: token },
     });
 
     if (!user) {
-      throw new BadRequestException('Invalid or expired token');
+      throw new BadRequestException('Invalid or expired verification token');
     }
 
     await this.prisma.user.update({
@@ -85,16 +83,14 @@ export class AuthService {
       },
     });
 
-    return { success: true };
+    return { message: 'Email verified successfully. You can now log in.' };
   }
 
   private async signToken(userId: string, email: string, role: string) {
+    const payload = { sub: userId, email, role };
+
     return {
-      access_token: await this.jwt.signAsync({
-        sub: userId,
-        email,
-        role,
-      }),
+      access_token: await this.jwt.signAsync(payload),
     };
   }
 }
