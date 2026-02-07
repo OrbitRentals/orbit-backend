@@ -100,6 +100,29 @@ export class VehicleImagesController {
     });
   }
 
+
+
+// 🔍 GET SINGLE VEHICLE (PUBLIC)
+@Get(':id')
+async getOne(@Param('id') id: string) {
+  const vehicle = await this.prisma.vehicle.findUnique({
+    where: { id },
+    include: {
+      images: {
+        orderBy: { order: 'asc' },
+      },
+    },
+  });
+
+  if (!vehicle || !vehicle.active) {
+    throw new NotFoundException('Vehicle not found');
+  }
+
+  return vehicle;
+}
+
+
+
   // 🗑 DELETE IMAGE
   @UseGuards(JwtGuard)
   @Delete(':imageId')
