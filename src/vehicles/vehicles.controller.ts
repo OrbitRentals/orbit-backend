@@ -20,21 +20,17 @@ export class VehiclesController {
   constructor(private prisma: PrismaService) {}
 
   // 🌍 LIST VEHICLES
-  // - Admin / Host: all vehicles
-  // - Public: active only
+  // Public → active only
+  // Admin / Host → all
   @Get()
-  async list(@Req() req: any) {
-    const user = req?.user;
+  async list(@Req() req: Request) {
+    const user = (req as any).user;
 
-    if (user && ['HOST', 'ADMIN'].includes(user.role)) {
-      return this.prisma.vehicle.findMany({
-        include: { images: true },
-        orderBy: { createdAt: 'desc' },
-      });
-    }
+    const isAdmin =
+      user && ['HOST', 'ADMIN'].includes(user.role);
 
     return this.prisma.vehicle.findMany({
-      where: { active: true },
+      where: isAdmin ? {} : { active: true },
       include: { images: true },
       orderBy: { createdAt: 'desc' },
     });
@@ -79,14 +75,7 @@ export class VehiclesController {
   async update(
     @Param('id') id: string,
     @Req() req: Request,
-    @Body()
-    body: {
-      make?: string;
-      model?: string;
-      year?: number;
-      dailyPrice?: number;
-      description?: string;
-    },
+    @Body() body: any,
   ) {
     const user = (req as any).user;
 
@@ -94,7 +83,10 @@ export class VehiclesController {
       throw new UnauthorizedException();
     }
 
-    const vehicle = await this.prisma.vehicle.findUnique({ where: { id } });
+    const vehicle = await this.prisma.vehicle.findUnique({
+      where: { id },
+    });
+
     if (!vehicle) {
       throw new NotFoundException('Vehicle not found');
     }
@@ -108,12 +100,13 @@ export class VehiclesController {
         dailyPrice: body.dailyPrice
           ? Number(body.dailyPrice)
           : vehicle.dailyPrice,
-        description: body.description ?? vehicle.description,
+        description:
+          body.description ?? vehicle.description,
       },
     });
   }
 
-  // 🔁 TOGGLE ACTIVE / INACTIVE
+  // 🔁 TOGGLE ACTIVE
   @UseGuards(JwtGuard)
   @Patch(':id/toggle')
   async toggle(@Param('id') id: string, @Req() req: Request) {
@@ -123,7 +116,10 @@ export class VehiclesController {
       throw new UnauthorizedException();
     }
 
-    const vehicle = await this.prisma.vehicle.findUnique({ where: { id } });
+    const vehicle = await this.prisma.vehicle.findUnique({
+      where: { id },
+    });
+
     if (!vehicle) {
       throw new NotFoundException('Vehicle not found');
     }
