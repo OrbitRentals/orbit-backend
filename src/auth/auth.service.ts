@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
@@ -13,8 +17,10 @@ export class AuthService {
 
   // 📝 REGISTER (email verification required)
   async register(email: string, password: string) {
+    const normalizedEmail = email.toLowerCase();
+
     const existing = await this.prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     });
 
     if (existing) {
@@ -26,7 +32,7 @@ export class AuthService {
 
     await this.prisma.user.create({
       data: {
-        email,
+        email: normalizedEmail,
         passwordHash,
         role: 'RENTER',
         emailVerified: false,
@@ -34,18 +40,23 @@ export class AuthService {
       },
     });
 
-    // 🔗 TODO: send email (next step)
-    console.log(`VERIFY LINK: https://orbitrentals.net/verify?token=${verificationToken}`);
+    // 🔗 EMAIL SENDING COMES NEXT (Step 4)
+    console.log(
+      `VERIFY LINK: https://orbitrentals.net/verify?token=${verificationToken}`,
+    );
 
     return {
-      message: 'Registration successful. Please check your email to verify your account.',
+      message:
+        'Registration successful. Please check your email to verify your account.',
     };
   }
 
-  // 🔑 LOGIN (blocked if not verified)
+  // 🔑 LOGIN (blocked until email verified)
   async login(email: string, password: string) {
+    const normalizedEmail = email.toLowerCase();
+
     const user = await this.prisma.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     });
 
     if (!user) {
@@ -53,7 +64,9 @@ export class AuthService {
     }
 
     if (!user.emailVerified) {
-      throw new UnauthorizedException('Email not verified');
+      throw new UnauthorizedException(
+        'Please verify your email before logging in',
+      );
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
@@ -72,7 +85,9 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new BadRequestException('Invalid or expired verification token');
+      throw new BadRequestException(
+        'Invalid or expired verification token',
+      );
     }
 
     await this.prisma.user.update({
@@ -83,10 +98,16 @@ export class AuthService {
       },
     });
 
-    return { message: 'Email verified successfully. You can now log in.' };
+    return {
+      message: 'Email verified successfully. You can now log in.',
+    };
   }
 
-  private async signToken(userId: string, email: string, role: string) {
+  private async signToken(
+    userId: string,
+    email: string,
+    role: string,
+  ) {
     const payload = { sub: userId, email, role };
 
     return {
