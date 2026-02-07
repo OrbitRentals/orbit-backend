@@ -18,16 +18,21 @@ import { Request } from 'express';
 export class VehiclesController {
   constructor(private prisma: PrismaService) {}
 
-  // 🌍 Public list (active only)
+  // 🌍 Public list (active vehicles only)
   @Get()
   async list() {
     return this.prisma.vehicle.findMany({
       where: { active: true },
+      include: {
+        images: {
+          orderBy: { order: 'asc' },
+        },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  // 🔐 Add vehicle (HOST / ADMIN only)
+  // 🔐 Add vehicle (HOST / ADMIN only — NO images here)
   @UseGuards(JwtGuard)
   @Post()
   async create(
@@ -38,7 +43,6 @@ export class VehiclesController {
       model: string;
       year: number;
       dailyPrice: number;
-      imageUrl?: string;
     },
   ) {
     const user = (req as any).user;
@@ -54,7 +58,6 @@ export class VehiclesController {
         model: body.model,
         year: Number(body.year),
         dailyPrice: Number(body.dailyPrice),
-        imageUrl: body.imageUrl ?? null,
         active: true,
       },
     });

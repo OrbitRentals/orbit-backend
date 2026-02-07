@@ -14,31 +14,25 @@ model User {
   role         Role      @default(RENTER)
   createdAt    DateTime  @default(now())
 
-  vehicles     Vehicle[] // relation back to vehicles
+  vehicles     Vehicle[]
 }
 
 model Vehicle {
-  id         String   @id @default(uuid())
+  id         String         @id @default(uuid())
   hostId     String
   make       String
   model      String
   year       Int
   dailyPrice Int
-  active     Boolean  @default(true)
-  imageUrl String?
-  images VehicleImage[]
-  createdAt  DateTime @default(now())
+  active     Boolean        @default(true)
+  createdAt  DateTime       @default(now())
 
-  host User @relation(fields: [hostId], references: [id])
+  host        User           @relation(fields: [hostId], references: [id])
+  images      VehicleImage[]
 
   @@index([hostId])
 }
 
-enum Role {
-  HOST
-  RENTER
-  ADMIN
-}
 model VehicleImage {
   id        String   @id @default(uuid())
   vehicleId String
@@ -47,8 +41,13 @@ model VehicleImage {
   order     Int      @default(0)
   createdAt DateTime @default(now())
 
-  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vehicle   Vehicle  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   @@index([vehicleId])
 }
 
+enum Role {
+  HOST
+  RENTER
+  ADMIN
+}
