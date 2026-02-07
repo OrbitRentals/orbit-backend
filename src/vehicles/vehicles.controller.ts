@@ -21,15 +21,16 @@ export class VehiclesController {
   // 🌍 Public list (active vehicles only)
 @Get()
 async list() {
-  return this.prisma.vehicle.findMany({
-    where: { active: true },
-    orderBy: { createdAt: 'desc' },
-    include: {
-      images: {
-        orderBy: { order: 'asc' },
-      },
+return this.prisma.vehicle.findMany({
+  where: { active: true },
+  orderBy: { createdAt: 'desc' },
+  include: {
+    images: {
+      orderBy: { order: 'asc' },
     },
-  });
+  },
+});
+
 }
 
   // 🔐 Add vehicle (HOST / ADMIN only — NO images here)
