@@ -10,6 +10,7 @@ import {
   Req,
   UnauthorizedException,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { PrismaService } from '../prisma/prisma.service';
@@ -21,7 +22,7 @@ import { Request } from 'express';
 export class VehicleImagesController {
   constructor(private prisma: PrismaService) {}
 
-  // 📸 Upload image (Cloudinary)
+  // 📸 UPLOAD IMAGE (Cloudinary)
   @UseGuards(JwtGuard)
   @Post()
   @UseInterceptors(
@@ -40,6 +41,10 @@ export class VehicleImagesController {
       throw new UnauthorizedException();
     }
 
+    if (!file || !file.path) {
+      throw new BadRequestException('Image upload failed');
+    }
+
     const vehicle = await this.prisma.vehicle.findUnique({
       where: { id: vehicleId },
     });
@@ -55,14 +60,14 @@ export class VehicleImagesController {
     return this.prisma.vehicleImage.create({
       data: {
         vehicleId,
-        url: file.path, // Cloudinary URL
+        url: file.path, // ✅ Cloudinary secure URL
         order: count,
-        isMain: count === 0,
+        isMain: count === 0, // first image becomes main
       },
     });
   }
 
-  // ⭐ Set main image
+  // ⭐ SET MAIN IMAGE
   @UseGuards(JwtGuard)
   @Patch(':imageId/main')
   async setMain(
@@ -76,6 +81,14 @@ export class VehicleImagesController {
       throw new UnauthorizedException();
     }
 
+    const image = await this.prisma.vehicleImage.findUnique({
+      where: { id: imageId },
+    });
+
+    if (!image || image.vehicleId !== vehicleId) {
+      throw new NotFoundException('Image not found for this vehicle');
+    }
+
     await this.prisma.vehicleImage.updateMany({
       where: { vehicleId },
       data: { isMain: false },
@@ -87,10 +100,11 @@ export class VehicleImagesController {
     });
   }
 
-  // 🗑 Delete image
+  // 🗑 DELETE IMAGE
   @UseGuards(JwtGuard)
   @Delete(':imageId')
   async deleteImage(
+    @Param('vehicleId') vehicleId: string,
     @Param('imageId') imageId: string,
     @Req() req: Request,
   ) {
@@ -98,6 +112,14 @@ export class VehicleImagesController {
 
     if (!user || !['HOST', 'ADMIN'].includes(user.role)) {
       throw new UnauthorizedException();
+    }
+
+    const image = await this.prisma.vehicleImage.findUnique({
+      where: { id: imageId },
+    });
+
+    if (!image || image.vehicleId !== vehicleId) {
+      throw new NotFoundException('Image not found');
     }
 
     return this.prisma.vehicleImage.delete({
