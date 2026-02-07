@@ -9,10 +9,19 @@ export default function App() {
   const [vehicles, setVehicles] = useState([]);
   const [loggedIn, setLoggedIn] = useState(false);
 
+  // 🔗 EMAIL VERIFICATION PAGE
+  if (window.location.pathname === "/verify") {
+    return (
+      <div style={{ padding: 24 }}>
+        <VerifyEmail />
+      </div>
+    );
+  }
+
   async function login() {
     const res = await api("/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password }),
     });
 
     if (res.access_token) {
@@ -43,13 +52,13 @@ export default function App() {
         <>
           <input
             placeholder="email"
-            onChange={e => setEmail(e.target.value)}
+            onChange={(e) => setEmail(e.target.value)}
           />
           <br />
           <input
             type="password"
             placeholder="password"
-            onChange={e => setPassword(e.target.value)}
+            onChange={(e) => setPassword(e.target.value)}
           />
           <br />
           <button onClick={login}>Login</button>
@@ -60,7 +69,7 @@ export default function App() {
         <>
           <h3>Available Vehicles</h3>
           <ul>
-            {vehicles.map(v => (
+            {vehicles.map((v) => (
               <li key={v.id}>
                 {v.year} {v.make} {v.model} — ${v.dailyPrice}/day
               </li>
