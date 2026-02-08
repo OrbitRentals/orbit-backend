@@ -17,7 +17,11 @@ export class AuthService {
 
   // 📝 REGISTER (email verification required)
   async register(email: string, password: string) {
-    const normalizedEmail = email.toLowerCase();
+    if (!email || !password) {
+      throw new BadRequestException('Email and password are required');
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
 
     const existing = await this.prisma.user.findUnique({
       where: { email: normalizedEmail },
@@ -34,13 +38,13 @@ export class AuthService {
       data: {
         email: normalizedEmail,
         passwordHash,
-        role: 'RENTER',
-        emailVerified: false,
+        role: 'RENTER',              // ✅ all new users are renters
+        emailVerified: false,        // ❗ blocked until verified
         verificationToken,
       },
     });
 
-    // 🔗 EMAIL SENDING COMES NEXT (Step 4)
+    // 🔗 EMAIL SENDING (console for now)
     console.log(
       `VERIFY LINK: https://orbitrentals.net/verify?token=${verificationToken}`,
     );
@@ -53,7 +57,11 @@ export class AuthService {
 
   // 🔑 LOGIN (blocked until email verified)
   async login(email: string, password: string) {
-    const normalizedEmail = email.toLowerCase();
+    if (!email || !password) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
 
     const user = await this.prisma.user.findUnique({
       where: { email: normalizedEmail },
@@ -80,6 +88,10 @@ export class AuthService {
 
   // ✅ VERIFY EMAIL
   async verifyEmail(token: string) {
+    if (!token) {
+      throw new BadRequestException('Verification token is required');
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { verificationToken: token },
     });
@@ -103,6 +115,7 @@ export class AuthService {
     };
   }
 
+  // 🔐 JWT
   private async signToken(
     userId: string,
     email: string,

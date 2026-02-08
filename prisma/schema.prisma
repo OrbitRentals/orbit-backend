@@ -20,6 +20,7 @@ model User {
   createdAt         DateTime @default(now())
 
   vehicles          Vehicle[]
+  bookings          Booking[]
 }
 
 model Vehicle {
@@ -35,6 +36,7 @@ model Vehicle {
 
   host        User           @relation(fields: [hostId], references: [id])
   images      VehicleImage[]
+  bookings    Booking[] 
 
   @@index([hostId])
 }
@@ -56,4 +58,26 @@ enum Role {
   HOST
   RENTER
   ADMIN
+}
+
+model Booking {
+  id        String   @id @default(uuid())
+  vehicleId String
+  userId    String
+  startDate DateTime
+  endDate   DateTime
+  status    BookingStatus @default(PENDING)
+  createdAt DateTime @default(now())
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
+  @@index([userId])
+}
+
+enum BookingStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
