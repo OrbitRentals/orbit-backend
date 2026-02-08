@@ -62,15 +62,15 @@ enum Role {
 
 model Booking {
   id        String   @id @default(uuid())
+
   vehicleId String
   userId    String
   startDate DateTime
   endDate   DateTime
   status    BookingStatus @default(PENDING)
-  createdAt DateTime @default(now())
-
-  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([vehicleId])
   @@index([userId])
@@ -78,6 +78,7 @@ model Booking {
 
 enum BookingStatus {
   PENDING
-  APPROVED
-  REJECTED
+  CONFIRMED
+  CANCELLED
 }
+
