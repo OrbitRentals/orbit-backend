@@ -9,12 +9,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import { Resend } from 'resend';
-import Twilio from 'twilio';
+import twilio from 'twilio';
 
 @Injectable()
 export class AuthService {
   private resend: Resend | null = null;
-  private twilio: Twilio | null = null;
+  private twilioClient: ReturnType<typeof twilio> | null = null;
 
   constructor(
     private prisma: PrismaService,
@@ -39,7 +39,7 @@ export class AuthService {
       process.env.TWILIO_ACCOUNT_SID &&
       process.env.TWILIO_AUTH_TOKEN
     ) {
-      this.twilio = Twilio(
+      this.twilioClient = twilio(
         process.env.TWILIO_ACCOUNT_SID,
         process.env.TWILIO_AUTH_TOKEN,
       );
@@ -109,7 +109,8 @@ export class AuthService {
       where: { email: normalizedEmail },
     });
 
-    if (!user) throw new UnauthorizedException('Invalid credentials');
+    if (!user)
+      throw new UnauthorizedException('Invalid credentials');
 
     if (!user.emailVerified) {
       throw new UnauthorizedException(
@@ -117,9 +118,13 @@ export class AuthService {
       );
     }
 
-    const valid = await bcrypt.compare(password, user.passwordHash);
+    const valid = await bcrypt.compare(
+      password,
+      user.passwordHash,
+    );
 
-    if (!valid) throw new UnauthorizedException('Invalid credentials');
+    if (!valid)
+      throw new UnauthorizedException('Invalid credentials');
 
     return this.signToken(user.id, user.email, user.role);
   }
@@ -153,13 +158,17 @@ export class AuthService {
   ////////////////////////////////////////////////////////////
 
   async sendPhoneOtp(userId: string, phone: string) {
-    if (!this.twilio) {
-      throw new BadRequestException('SMS service not configured');
+    if (!this.twilioClient) {
+      throw new BadRequestException(
+        'SMS service not configured',
+      );
     }
 
     const formattedPhone = phone.trim();
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const code = Math.floor(
+      100000 + Math.random() * 900000,
+    ).toString();
 
     const expires = new Date();
     expires.setMinutes(expires.getMinutes() + 10);
@@ -174,7 +183,7 @@ export class AuthService {
       },
     });
 
-    await this.twilio.messages.create({
+    await this.twilioClient.messages.create({
       body: `Your Orbit Rentals verification code is: ${code}`,
       from: process.env.TWILIO_PHONE_NUMBER,
       to: formattedPhone,
@@ -192,7 +201,8 @@ export class AuthService {
       where: { id: userId },
     });
 
-    if (!user) throw new BadRequestException('User not found');
+    if (!user)
+      throw new BadRequestException('User not found');
 
     if (!user.phoneOtpCode || !user.phoneOtpExpiresAt) {
       throw new BadRequestException('No OTP requested');
