@@ -110,4 +110,20 @@ export class AdminController {
   viewLicense(@Param('id') id: string) {
     return this.adminService.getUserLicense(id);
   }
+
+////////////////////////////////////////////////////////////
+// 📩 VIEW MESSAGES
+////////////////////////////////////////////////////////////
+
+@Get('messages')
+@Roles('FOUNDER', 'ADMIN')
+getAllMessages() {
+  return this.adminService.getAllMessages();
+}
+
+@Get('messages/:bookingId')
+@Roles('FOUNDER', 'ADMIN')
+getMessagesForBooking(@Param('bookingId') bookingId: string) {
+  return this.adminService.getMessagesByBooking(bookingId);
+  }
 }

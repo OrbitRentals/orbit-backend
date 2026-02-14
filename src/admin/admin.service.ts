@@ -220,4 +220,48 @@ export class AdminService {
       where: { id: targetId },
     });
   }
+  ////////////////////////////////////////////////////////////
+// 📩 GET ALL MESSAGES (ADMIN VIEW)
+////////////////////////////////////////////////////////////
+
+async getAllMessages() {
+  return this.prisma.message.findMany({
+    include: {
+      booking: {
+        include: {
+          vehicle: true,
+        },
+      },
+      sender: {
+        select: {
+          id: true,
+          email: true,
+          role: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+////////////////////////////////////////////////////////////
+// 📩 GET MESSAGES BY BOOKING
+////////////////////////////////////////////////////////////
+
+async getMessagesByBooking(bookingId: string) {
+  return this.prisma.message.findMany({
+    where: { bookingId },
+    include: {
+      sender: {
+        select: {
+          id: true,
+          email: true,
+          role: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+}
+
 }
