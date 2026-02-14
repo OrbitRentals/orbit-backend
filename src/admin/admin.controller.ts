@@ -6,8 +6,9 @@ import {
   Delete,
   Body,
   UseGuards,
-  Request,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { AdminService } from './admin.service';
 import { JwtGuard } from '../auth/jwt.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -43,7 +44,7 @@ export class AdminController {
   changeRole(
     @Param('id') targetId: string,
     @Body('role') role: Role,
-    @Request() req,
+    @Req() req: Request & { user: any },
   ) {
     return this.adminService.changeRole(
       req.user.id,
@@ -92,7 +93,7 @@ export class AdminController {
   @Roles('FOUNDER')
   delete(
     @Param('id') targetId: string,
-    @Request() req,
+    @Req() req: Request & { user: any },
   ) {
     return this.adminService.deleteUser(
       req.user.id,
