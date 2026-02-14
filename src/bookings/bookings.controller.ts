@@ -15,6 +15,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtGuard } from '../auth/jwt.guard';
 import { Request } from 'express';
+import { BookingStatus, VerificationStatus } from '@prisma/client';
 
 @Controller()
 export class BookingsController {
@@ -48,14 +49,14 @@ export class BookingsController {
       where: { id: vehicleId },
     });
 
-    if (!vehicle) {
-      throw new NotFoundException('Vehicle not found');
+    if (!vehicle || !vehicle.active) {
+      throw new NotFoundException('Vehicle not available');
     }
 
     const conflict = await this.prisma.booking.findFirst({
       where: {
         vehicleId,
-        status: { in: ['PENDING', 'CONFIRMED'] },
+        status: { in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] },
         startDate: { lt: endDate },
         endDate: { gt: startDate },
       },
@@ -72,10 +73,6 @@ export class BookingsController {
   async getMyBookings(@Req() req: any) {
     const user = req.user;
 
-    if (user.role !== 'RENTER') {
-      throw new ForbiddenException('Only renters can view their bookings');
-    }
-
     return this.prisma.booking.findMany({
       where: { userId: user.sub },
       include: { vehicle: true },
@@ -91,8 +88,8 @@ export class BookingsController {
   async getHostBookings(@Req() req: any) {
     const user = req.user;
 
-    if (user.role !== 'HOST' && user.role !== 'ADMIN') {
-      throw new ForbiddenException('Only hosts can view these bookings');
+    if (!['HOST', 'ADMIN', 'FOUNDER'].includes(user.role)) {
+      throw new ForbiddenException('Not allowed');
     }
 
     return this.prisma.booking.findMany({
@@ -120,28 +117,39 @@ export class BookingsController {
     @Body('end') end: string,
     @Req() req: Request,
   ) {
+    const user: any = req.user;
+
     if (!vehicleId || !start || !end) {
       throw new BadRequestException('Missing required fields');
     }
 
-    const user: any = req.user;
+    if (user.role !== 'RENTER') {
+      throw new ForbiddenException('Only renters can book vehicles');
+    }
 
-    if (!user || user.role !== 'RENTER') {
-      throw new ForbiddenException('Only renters can create bookings');
+    // 🔒 BLOCK IF NOT VERIFIED
+    const fullUser = await this.prisma.user.findUnique({
+      where: { id: user.sub },
+    });
+
+    if (!fullUser)
+      throw new NotFoundException('User not found');
+
+    if (fullUser.isSuspended) {
+      throw new ForbiddenException('Account suspended');
+    }
+
+    if (fullUser.verificationStatus !== VerificationStatus.APPROVED) {
+      throw new ForbiddenException('Identity not approved');
     }
 
     const startDate = new Date(start);
     const endDate = new Date(end);
 
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-      throw new BadRequestException('Invalid date format');
-    }
-
     if (startDate >= endDate) {
       throw new BadRequestException('End date must be after start date');
     }
 
-    // 🚫 BLOCK PAST BOOKINGS
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -153,15 +161,20 @@ export class BookingsController {
       where: { id: vehicleId },
     });
 
-    if (!vehicle) {
-      throw new NotFoundException('Vehicle not found');
+    if (!vehicle || !vehicle.active) {
+      throw new NotFoundException('Vehicle not available');
     }
 
-    // 🚫 Prevent overlap
+    // 🚫 BLOCK HOST BOOKING OWN VEHICLE
+    if (vehicle.hostId === user.sub) {
+      throw new ForbiddenException('Cannot book your own vehicle');
+    }
+
+    // 🚫 OVERLAP PROTECTION
     const conflict = await this.prisma.booking.findFirst({
       where: {
         vehicleId,
-        status: { in: ['PENDING', 'CONFIRMED'] },
+        status: { in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] },
         startDate: { lt: endDate },
         endDate: { gt: startDate },
       },
@@ -179,7 +192,7 @@ export class BookingsController {
         userId: user.sub,
         startDate,
         endDate,
-        status: 'PENDING',
+        status: BookingStatus.PENDING,
       },
     });
   }
@@ -203,13 +216,13 @@ export class BookingsController {
       throw new ForbiddenException('Not your vehicle');
     }
 
-    if (booking.status !== 'PENDING') {
-      throw new BadRequestException('Booking cannot be approved');
+    if (booking.status !== BookingStatus.PENDING) {
+      throw new BadRequestException('Cannot approve booking');
     }
 
     return this.prisma.booking.update({
       where: { id },
-      data: { status: 'CONFIRMED' },
+      data: { status: BookingStatus.CONFIRMED },
     });
   }
 
@@ -219,8 +232,6 @@ export class BookingsController {
   @UseGuards(JwtGuard)
   @Patch('bookings/:id/reject')
   async rejectBooking(@Param('id') id: string, @Req() req: any) {
-    const user = req.user;
-
     const booking = await this.prisma.booking.findUnique({
       where: { id },
       include: { vehicle: true },
@@ -228,17 +239,17 @@ export class BookingsController {
 
     if (!booking) throw new NotFoundException('Booking not found');
 
-    if (booking.vehicle.hostId !== user.sub) {
+    if (booking.vehicle.hostId !== req.user.sub) {
       throw new ForbiddenException('Not your vehicle');
     }
 
-    if (booking.status !== 'PENDING') {
-      throw new BadRequestException('Booking cannot be rejected');
+    if (booking.status !== BookingStatus.PENDING) {
+      throw new BadRequestException('Cannot reject booking');
     }
 
     return this.prisma.booking.update({
       where: { id },
-      data: { status: 'CANCELLED' },
+      data: { status: BookingStatus.CANCELLED },
     });
   }
 
@@ -248,25 +259,23 @@ export class BookingsController {
   @UseGuards(JwtGuard)
   @Patch('bookings/:id/cancel')
   async cancelBooking(@Param('id') id: string, @Req() req: any) {
-    const user = req.user;
-
     const booking = await this.prisma.booking.findUnique({
       where: { id },
     });
 
     if (!booking) throw new NotFoundException('Booking not found');
 
-    if (booking.userId !== user.sub) {
+    if (booking.userId !== req.user.sub) {
       throw new ForbiddenException('Not your booking');
     }
 
-    if (booking.status !== 'PENDING') {
-      throw new BadRequestException('Booking cannot be cancelled');
+    if (booking.status !== BookingStatus.PENDING) {
+      throw new BadRequestException('Cannot cancel booking');
     }
 
     return this.prisma.booking.update({
       where: { id },
-      data: { status: 'CANCELLED' },
+      data: { status: BookingStatus.CANCELLED },
     });
   }
 }

@@ -7,6 +7,35 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+//////////////////////////////////////////////////////
+// ENUMS
+//////////////////////////////////////////////////////
+
+enum Role {
+  FOUNDER
+  ADMIN
+  MODERATOR
+  HOST
+  RENTER
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+//////////////////////////////////////////////////////
+// USER
+//////////////////////////////////////////////////////
+
 model User {
   id                String   @id @default(uuid())
   email             String   @unique
@@ -17,11 +46,57 @@ model User {
   emailVerified     Boolean  @default(false)
   verificationToken String?  @unique
 
+  // 📱 PHONE VERIFICATION
+  phone             String?
+  phoneVerified     Boolean  @default(false)
+  phoneOtpCode      String?
+  phoneOtpExpiresAt DateTime?
+
+  // 👤 PROFILE INFO
+  firstName         String?
+  lastName          String?
+  dateOfBirth       DateTime?
+  addressLine1      String?
+  city              String?
+  state             String?
+  zip               String?
+
+  // 🪪 LICENSE + IDENTITY (KYC)
+  licenseFrontUrl   String?
+  licenseBackUrl    String?
+  selfieUrl         String?
+  verificationStatus VerificationStatus @default(PENDING)
+
+  // 🚫 MODERATION
+  isSuspended       Boolean  @default(false)
+  suspendedUntil    DateTime?
+  suspensionReason  String?
+
+  // ⭐ Reputation
+  ratingAverage     Float    @default(0)
+  ratingCount       Int      @default(0)
+
   createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  //////////////////////////////////////////////////////
+  // RELATIONS
+  //////////////////////////////////////////////////////
 
   vehicles          Vehicle[]
   bookings          Booking[]
+
+  sentMessages      Message[] @relation("SentMessages")
+  reviewsGiven      Review[]  @relation("ReviewsGiven")
+  reviewsReceived   Review[]  @relation("ReviewsReceived")
+
+  @@index([role])
+  @@index([isSuspended])
 }
+
+//////////////////////////////////////////////////////
+// VEHICLE
+//////////////////////////////////////////////////////
 
 model Vehicle {
   id          String         @id @default(uuid())
@@ -41,6 +116,10 @@ model Vehicle {
   @@index([hostId])
 }
 
+//////////////////////////////////////////////////////
+// VEHICLE IMAGES
+//////////////////////////////////////////////////////
+
 model VehicleImage {
   id        String   @id @default(uuid())
   vehicleId String
@@ -53,6 +132,10 @@ model VehicleImage {
 
   @@index([vehicleId])
 }
+
+//////////////////////////////////////////////////////
+// BOOKING
+//////////////////////////////////////////////////////
 
 model Booking {
   id        String         @id @default(uuid())
@@ -69,19 +152,47 @@ model Booking {
   vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  messages  Message[]
+  review    Review?
+
   @@index([vehicleId])
   @@index([userId])
-  @@index([vehicleId, startDate, endDate]) // 🚀 fast availability checks
+  @@index([vehicleId, startDate, endDate])
 }
 
-enum Role {
-  HOST
-  RENTER
-  ADMIN
+//////////////////////////////////////////////////////
+// MESSAGE (BOOKING LOCKED CHAT)
+//////////////////////////////////////////////////////
+
+model Message {
+  id        String   @id @default(uuid())
+  bookingId String
+  senderId  String
+  content   String
+  createdAt DateTime @default(now())
+
+  booking   Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  sender    User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
 }
 
-enum BookingStatus {
-  PENDING
-  CONFIRMED
-  CANCELLED
+//////////////////////////////////////////////////////
+// REVIEW SYSTEM
+//////////////////////////////////////////////////////
+
+model Review {
+  id         String   @id @default(uuid())
+  bookingId  String   @unique
+  reviewerId String
+  targetId   String
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  reviewer   User     @relation("ReviewsGiven", fields: [reviewerId], references: [id], onDelete: Cascade)
+  target     User     @relation("ReviewsReceived", fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@index([targetId])
 }
