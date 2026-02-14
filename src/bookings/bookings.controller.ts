@@ -18,27 +18,42 @@ export class BookingsController {
     @Query('end') end: string,
   ) {
     if (!vehicleId || !start || !end) {
-      throw new BadRequestException('Missing parameters');
+      throw new BadRequestException('Missing required parameters');
     }
 
     const startDate = new Date(start);
     const endDate = new Date(end);
 
-    if (startDate >= endDate) {
-      throw new BadRequestException('Invalid date range');
+    // ✅ Validate valid dates
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      throw new BadRequestException('Invalid date format');
     }
 
+    if (startDate >= endDate) {
+      throw new BadRequestException('End date must be after start date');
+    }
+
+    // 🚫 Check overlapping bookings
     const conflict = await this.prisma.booking.findFirst({
       where: {
         vehicleId,
         status: { in: ['PENDING', 'CONFIRMED'] },
         AND: [
-          { startDate: { lt: endDate } },
-          { endDate: { gt: startDate } },
+          {
+            startDate: { lt: endDate },
+          },
+          {
+            endDate: { gt: startDate },
+          },
         ],
       },
     });
 
-    return { available: !conflict };
+    return {
+      available: !conflict,
+      message: conflict
+        ? 'Vehicle not available for selected dates'
+        : 'Vehicle is available',
+    };
   }
 }

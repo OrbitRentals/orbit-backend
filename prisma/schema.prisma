@@ -36,7 +36,7 @@ model Vehicle {
 
   host        User           @relation(fields: [hostId], references: [id])
   images      VehicleImage[]
-  bookings    Booking[] 
+  bookings    Booking[]
 
   @@index([hostId])
 }
@@ -54,26 +54,30 @@ model VehicleImage {
   @@index([vehicleId])
 }
 
-enum Role {
-  HOST
-  RENTER
-  ADMIN
-}
-
 model Booking {
-  id        String   @id @default(uuid())
+  id        String         @id @default(uuid())
 
   vehicleId String
   userId    String
+
   startDate DateTime
   endDate   DateTime
-  status    BookingStatus @default(PENDING)
-  createdAt DateTime      @default(now())
+
+  status    BookingStatus  @default(PENDING)
+  createdAt DateTime       @default(now())
+
   vehicle   Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([vehicleId])
   @@index([userId])
+  @@index([vehicleId, startDate, endDate]) // 🚀 fast availability checks
+}
+
+enum Role {
+  HOST
+  RENTER
+  ADMIN
 }
 
 enum BookingStatus {
@@ -81,4 +85,3 @@ enum BookingStatus {
   CONFIRMED
   CANCELLED
 }
-
