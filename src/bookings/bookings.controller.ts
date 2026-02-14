@@ -2,8 +2,10 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Body,
   Query,
+  Param,
   BadRequestException,
   NotFoundException,
   UseGuards,
@@ -59,9 +61,52 @@ export class BookingsController {
       },
     });
 
-    return {
-      available: !conflict,
-    };
+    return { available: !conflict };
+  }
+
+  // =========================================
+  // 👤 GET MY BOOKINGS (RENTER)
+  // =========================================
+  @UseGuards(JwtGuard)
+  @Get('bookings/my')
+  async getMyBookings(@Req() req: any) {
+    const user = req.user;
+
+    if (user.role !== 'RENTER') {
+      throw new ForbiddenException('Only renters can view their bookings');
+    }
+
+    return this.prisma.booking.findMany({
+      where: { userId: user.sub },
+      include: { vehicle: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  // =========================================
+  // 🛠 GET HOST BOOKINGS
+  // =========================================
+  @UseGuards(JwtGuard)
+  @Get('bookings/host')
+  async getHostBookings(@Req() req: any) {
+    const user = req.user;
+
+    if (user.role !== 'HOST' && user.role !== 'ADMIN') {
+      throw new ForbiddenException('Only hosts can view these bookings');
+    }
+
+    return this.prisma.booking.findMany({
+      where: {
+        vehicle: {
+          hostId: user.sub,
+        },
+      },
+      include: {
+        vehicle: true,
+        user: { select: { id: true, email: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
   }
 
   // =========================================
@@ -81,11 +126,7 @@ export class BookingsController {
 
     const user: any = req.user;
 
-    if (!user) {
-      throw new ForbiddenException('Unauthorized');
-    }
-
-    if (user.role !== 'RENTER') {
+    if (!user || user.role !== 'RENTER') {
       throw new ForbiddenException('Only renters can create bookings');
     }
 
@@ -100,14 +141,12 @@ export class BookingsController {
       throw new BadRequestException('End date must be after start date');
     }
 
-    // ✅ BLOCK PAST BOOKINGS
+    // 🚫 BLOCK PAST BOOKINGS
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     if (startDate < today) {
-      throw new BadRequestException(
-        'Start date cannot be in the past',
-      );
+      throw new BadRequestException('Start date cannot be in the past');
     }
 
     const vehicle = await this.prisma.vehicle.findUnique({
@@ -118,7 +157,7 @@ export class BookingsController {
       throw new NotFoundException('Vehicle not found');
     }
 
-    // 🚫 Prevent overlapping bookings
+    // 🚫 Prevent overlap
     const conflict = await this.prisma.booking.findFirst({
       where: {
         vehicleId,
@@ -134,7 +173,7 @@ export class BookingsController {
       );
     }
 
-    const booking = await this.prisma.booking.create({
+    return this.prisma.booking.create({
       data: {
         vehicleId,
         userId: user.sub,
@@ -143,10 +182,91 @@ export class BookingsController {
         status: 'PENDING',
       },
     });
+  }
 
-    return {
-      message: 'Booking created successfully',
-      booking,
-    };
+  // =========================================
+  // ✅ APPROVE BOOKING (HOST)
+  // =========================================
+  @UseGuards(JwtGuard)
+  @Patch('bookings/:id/approve')
+  async approveBooking(@Param('id') id: string, @Req() req: any) {
+    const user = req.user;
+
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+      include: { vehicle: true },
+    });
+
+    if (!booking) throw new NotFoundException('Booking not found');
+
+    if (booking.vehicle.hostId !== user.sub) {
+      throw new ForbiddenException('Not your vehicle');
+    }
+
+    if (booking.status !== 'PENDING') {
+      throw new BadRequestException('Booking cannot be approved');
+    }
+
+    return this.prisma.booking.update({
+      where: { id },
+      data: { status: 'CONFIRMED' },
+    });
+  }
+
+  // =========================================
+  // ❌ REJECT BOOKING (HOST)
+  // =========================================
+  @UseGuards(JwtGuard)
+  @Patch('bookings/:id/reject')
+  async rejectBooking(@Param('id') id: string, @Req() req: any) {
+    const user = req.user;
+
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+      include: { vehicle: true },
+    });
+
+    if (!booking) throw new NotFoundException('Booking not found');
+
+    if (booking.vehicle.hostId !== user.sub) {
+      throw new ForbiddenException('Not your vehicle');
+    }
+
+    if (booking.status !== 'PENDING') {
+      throw new BadRequestException('Booking cannot be rejected');
+    }
+
+    return this.prisma.booking.update({
+      where: { id },
+      data: { status: 'CANCELLED' },
+    });
+  }
+
+  // =========================================
+  // 🚫 CANCEL BOOKING (RENTER)
+  // =========================================
+  @UseGuards(JwtGuard)
+  @Patch('bookings/:id/cancel')
+  async cancelBooking(@Param('id') id: string, @Req() req: any) {
+    const user = req.user;
+
+    const booking = await this.prisma.booking.findUnique({
+      where: { id },
+    });
+
+    if (!booking) throw new NotFoundException('Booking not found');
+
+    if (booking.userId !== user.sub) {
+      throw new ForbiddenException('Not your booking');
+    }
+
+    if (booking.status !== 'PENDING') {
+      throw new BadRequestException('Booking cannot be cancelled');
+    }
+
+    return this.prisma.booking.update({
+      where: { id },
+      data: { status: 'CANCELLED' },
+    });
   }
 }
