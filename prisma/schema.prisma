@@ -90,6 +90,8 @@ model User {
   reviewsGiven      Review[]  @relation("ReviewsGiven")
   reviewsReceived   Review[]  @relation("ReviewsReceived")
 
+  notifications     Notification[]   // ✅ ADDED
+
   @@index([role])
   @@index([isSuspended])
 }
@@ -195,4 +197,22 @@ model Review {
   target     User     @relation("ReviewsReceived", fields: [targetId], references: [id], onDelete: Cascade)
 
   @@index([targetId])
+}
+
+//////////////////////////////////////////////////////
+// NOTIFICATIONS
+//////////////////////////////////////////////////////
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([read])
 }

@@ -16,10 +16,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { JwtGuard } from '../auth/jwt.guard';
 import { Request } from 'express';
 import { BookingStatus, VerificationStatus } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Controller()
 export class BookingsController {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
   // =========================================
   // 🔎 CHECK VEHICLE AVAILABILITY (PUBLIC)
@@ -190,7 +194,7 @@ export class BookingsController {
       );
     }
 
-    return this.prisma.booking.create({
+    const booking = await this.prisma.booking.create({
       data: {
         vehicleId,
         userId: user.sub,
@@ -199,6 +203,15 @@ export class BookingsController {
         status: BookingStatus.PENDING,
       },
     });
+
+    // 🔔 Notify Host
+    await this.notifications.create(
+      vehicle.hostId,
+      'New Booking Request',
+      'You have a new booking request awaiting approval.',
+    );
+
+    return booking;
   }
 
   // =========================================
@@ -222,10 +235,19 @@ export class BookingsController {
       throw new BadRequestException('Cannot approve booking');
     }
 
-    return this.prisma.booking.update({
+    const updated = await this.prisma.booking.update({
       where: { id },
       data: { status: BookingStatus.CONFIRMED },
     });
+
+    // 🔔 Notify Renter
+    await this.notifications.create(
+      booking.userId,
+      'Booking Approved',
+      'Your booking has been approved.',
+    );
+
+    return updated;
   }
 
   // =========================================
@@ -249,10 +271,19 @@ export class BookingsController {
       throw new BadRequestException('Cannot reject booking');
     }
 
-    return this.prisma.booking.update({
+    const updated = await this.prisma.booking.update({
       where: { id },
       data: { status: BookingStatus.CANCELLED },
     });
+
+    // 🔔 Notify Renter
+    await this.notifications.create(
+      booking.userId,
+      'Booking Rejected',
+      'Your booking request was rejected.',
+    );
+
+    return updated;
   }
 
   // =========================================
