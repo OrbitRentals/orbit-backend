@@ -11,7 +11,6 @@ import { PrismaService } from '../prisma/prisma.service';
 export class BookingsController {
   constructor(private prisma: PrismaService) {}
 
-  // 🔎 CHECK VEHICLE AVAILABILITY
   @Get()
   async checkAvailability(
     @Query('vehicleId') vehicleId: string,
@@ -25,11 +24,7 @@ export class BookingsController {
     const startDate = new Date(start);
     const endDate = new Date(end);
 
-    // ✅ Validate date format
-    if (
-      isNaN(startDate.getTime()) ||
-      isNaN(endDate.getTime())
-    ) {
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
       throw new BadRequestException('Invalid date format');
     }
 
@@ -39,7 +34,6 @@ export class BookingsController {
       );
     }
 
-    // ✅ Ensure vehicle exists
     const vehicle = await this.prisma.vehicle.findUnique({
       where: { id: vehicleId },
     });
@@ -48,7 +42,6 @@ export class BookingsController {
       throw new NotFoundException('Vehicle not found');
     }
 
-    // 🚫 Overlapping booking check
     const conflict = await this.prisma.booking.findFirst({
       where: {
         vehicleId,
@@ -64,9 +57,6 @@ export class BookingsController {
 
     return {
       available,
-      vehicleId,
-      start: startDate,
-      end: endDate,
       message: available
         ? 'Vehicle is available'
         : 'Vehicle not available for selected dates',
