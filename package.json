@@ -3,11 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-  "build": "node node_modules/typescript/bin/tsc && node node_modules/prisma/build/index.js generate",
-  "start": "node dist/main.js",
-  "start:dev": "nest start --watch"
-}
-,
+    "build": "node node_modules/typescript/bin/tsc && node node_modules/prisma/build/index.js generate",
+    "start": "node dist/main.js",
+    "start:dev": "nest start --watch"
+  },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
     "@nestjs/core": "^10.0.0",
@@ -24,6 +23,7 @@
     "passport-jwt": "^4.0.1",
     "prisma": "^5.22.0",
     "reflect-metadata": "^0.1.13",
+    "resend": "^6.9.2",
     "rxjs": "^7.8.1",
     "typescript": "^5.3.3"
   },

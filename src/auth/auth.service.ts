@@ -7,15 +7,18 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
+import { Resend } from 'resend';
 
 @Injectable()
 export class AuthService {
+  private resend = new Resend(process.env.RESEND_API_KEY);
+
   constructor(
     private prisma: PrismaService,
     private jwt: JwtService,
   ) {}
 
-  // 📝 REGISTER (email verification required)
+  // 📝 REGISTER
   async register(email: string, password: string) {
     if (!email || !password) {
       throw new BadRequestException('Email and password are required');
@@ -38,16 +41,36 @@ export class AuthService {
       data: {
         email: normalizedEmail,
         passwordHash,
-        role: 'RENTER',              // ✅ all new users are renters
-        emailVerified: false,        // ❗ blocked until verified
+        role: 'RENTER',
+        emailVerified: false,
         verificationToken,
       },
     });
 
-    // 🔗 EMAIL SENDING (console for now)
-    console.log(
-      `VERIFY LINK: https://orbitrentals.net/verify?token=${verificationToken}`,
-    );
+    const verifyUrl = `https://orbitrentals.net/verify?token=${verificationToken}`;
+
+    // 📧 SEND REAL VERIFICATION EMAIL
+    try {
+      await this.resend.emails.send({
+        from: 'Orbit Rentals <noreply@orbitrentals.net>',
+        to: normalizedEmail,
+        subject: 'Verify your Orbit Rentals account',
+        html: `
+          <h2>Welcome to Orbit Rentals 🚗</h2>
+          <p>Please verify your email to activate your account.</p>
+          <p>
+            <a href="${verifyUrl}"
+              style="display:inline-block;padding:12px 20px;background:#111;color:#fff;text-decoration:none;border-radius:6px;">
+              Verify My Account
+            </a>
+          </p>
+          <p>If you didn’t create this account, you can ignore this email.</p>
+        `,
+      });
+    } catch (error) {
+      console.error('Resend error:', error);
+      throw new BadRequestException('Failed to send verification email');
+    }
 
     return {
       message:
@@ -55,7 +78,7 @@ export class AuthService {
     };
   }
 
-  // 🔑 LOGIN (blocked until email verified)
+  // 🔑 LOGIN
   async login(email: string, password: string) {
     if (!email || !password) {
       throw new UnauthorizedException('Invalid credentials');
@@ -115,7 +138,7 @@ export class AuthService {
     };
   }
 
-  // 🔐 JWT
+  // 🔐 JWT SIGN
   private async signToken(
     userId: string,
     email: string,
