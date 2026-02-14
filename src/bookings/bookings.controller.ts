@@ -26,7 +26,10 @@ export class BookingsController {
     const endDate = new Date(end);
 
     // ✅ Validate date format
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    if (
+      isNaN(startDate.getTime()) ||
+      isNaN(endDate.getTime())
+    ) {
       throw new BadRequestException('Invalid date format');
     }
 
@@ -45,15 +48,15 @@ export class BookingsController {
       throw new NotFoundException('Vehicle not found');
     }
 
-    // 🚫 Overlap logic
+    // 🚫 Overlapping booking check
     const conflict = await this.prisma.booking.findFirst({
       where: {
         vehicleId,
-        status: { in: ['PENDING', 'CONFIRMED'] },
-        AND: [
-          { startDate: { lt: endDate } },
-          { endDate: { gt: startDate } },
-        ],
+        status: {
+          in: ['PENDING', 'CONFIRMED'],
+        },
+        startDate: { lt: endDate },
+        endDate: { gt: startDate },
       },
     });
 
@@ -61,6 +64,9 @@ export class BookingsController {
 
     return {
       available,
+      vehicleId,
+      start: startDate,
+      end: endDate,
       message: available
         ? 'Vehicle is available'
         : 'Vehicle not available for selected dates',
