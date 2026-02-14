@@ -60,3 +60,8 @@ export class BookingsController {
       },
     });
 
+    return {
+      available: !conflict,
+    };
+  }
+}
