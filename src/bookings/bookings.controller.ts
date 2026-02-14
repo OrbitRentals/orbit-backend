@@ -3,6 +3,7 @@ import {
   Get,
   Query,
   BadRequestException,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -24,36 +25,45 @@ export class BookingsController {
     const startDate = new Date(start);
     const endDate = new Date(end);
 
-    // ✅ Validate valid dates
+    // ✅ Validate date format
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
       throw new BadRequestException('Invalid date format');
     }
 
     if (startDate >= endDate) {
-      throw new BadRequestException('End date must be after start date');
+      throw new BadRequestException(
+        'End date must be after start date',
+      );
     }
 
-    // 🚫 Check overlapping bookings
+    // ✅ Ensure vehicle exists
+    const vehicle = await this.prisma.vehicle.findUnique({
+      where: { id: vehicleId },
+    });
+
+    if (!vehicle) {
+      throw new NotFoundException('Vehicle not found');
+    }
+
+    // 🚫 Overlap logic
     const conflict = await this.prisma.booking.findFirst({
       where: {
         vehicleId,
         status: { in: ['PENDING', 'CONFIRMED'] },
         AND: [
-          {
-            startDate: { lt: endDate },
-          },
-          {
-            endDate: { gt: startDate },
-          },
+          { startDate: { lt: endDate } },
+          { endDate: { gt: startDate } },
         ],
       },
     });
 
+    const available = !conflict;
+
     return {
-      available: !conflict,
-      message: conflict
-        ? 'Vehicle not available for selected dates'
-        : 'Vehicle is available',
+      available,
+      message: available
+        ? 'Vehicle is available'
+        : 'Vehicle not available for selected dates',
     };
   }
 }
