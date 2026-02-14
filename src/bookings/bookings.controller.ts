@@ -37,10 +37,6 @@ export class BookingsController {
     const startDate = new Date(start);
     const endDate = new Date(end);
 
-    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-      throw new BadRequestException('Invalid date format');
-    }
-
     if (startDate >= endDate) {
       throw new BadRequestException('End date must be after start date');
     }
@@ -66,15 +62,13 @@ export class BookingsController {
   }
 
   // =========================================
-  // 👤 GET MY BOOKINGS (RENTER)
+  // 👤 GET MY BOOKINGS
   // =========================================
   @UseGuards(JwtGuard)
   @Get('bookings/my')
   async getMyBookings(@Req() req: any) {
-    const user = req.user;
-
     return this.prisma.booking.findMany({
-      where: { userId: user.sub },
+      where: { userId: req.user.sub },
       include: { vehicle: true },
       orderBy: { createdAt: 'desc' },
     });
@@ -86,16 +80,14 @@ export class BookingsController {
   @UseGuards(JwtGuard)
   @Get('bookings/host')
   async getHostBookings(@Req() req: any) {
-    const user = req.user;
-
-    if (!['HOST', 'ADMIN', 'FOUNDER'].includes(user.role)) {
+    if (!['HOST', 'ADMIN', 'FOUNDER'].includes(req.user.role)) {
       throw new ForbiddenException('Not allowed');
     }
 
     return this.prisma.booking.findMany({
       where: {
         vehicle: {
-          hostId: user.sub,
+          hostId: req.user.sub,
         },
       },
       include: {
@@ -107,7 +99,7 @@ export class BookingsController {
   }
 
   // =========================================
-  // 🚗 CREATE BOOKING (RENTER ONLY)
+  // 🚗 CREATE BOOKING
   // =========================================
   @UseGuards(JwtGuard)
   @Post('bookings')
@@ -127,16 +119,30 @@ export class BookingsController {
       throw new ForbiddenException('Only renters can book vehicles');
     }
 
-    // 🔒 BLOCK IF NOT VERIFIED
     const fullUser = await this.prisma.user.findUnique({
       where: { id: user.sub },
     });
 
-    if (!fullUser)
-      throw new NotFoundException('User not found');
+    if (!fullUser) throw new NotFoundException('User not found');
 
+    // 🔒 SECURITY BLOCKS
     if (fullUser.isSuspended) {
       throw new ForbiddenException('Account suspended');
+    }
+
+    if (
+      fullUser.suspendedUntil &&
+      fullUser.suspendedUntil > new Date()
+    ) {
+      throw new ForbiddenException('Account temporarily suspended');
+    }
+
+    if (!fullUser.emailVerified) {
+      throw new ForbiddenException('Email not verified');
+    }
+
+    if (!fullUser.phoneVerified) {
+      throw new ForbiddenException('Phone not verified');
     }
 
     if (fullUser.verificationStatus !== VerificationStatus.APPROVED) {
@@ -165,12 +171,10 @@ export class BookingsController {
       throw new NotFoundException('Vehicle not available');
     }
 
-    // 🚫 BLOCK HOST BOOKING OWN VEHICLE
     if (vehicle.hostId === user.sub) {
       throw new ForbiddenException('Cannot book your own vehicle');
     }
 
-    // 🚫 OVERLAP PROTECTION
     const conflict = await this.prisma.booking.findFirst({
       where: {
         vehicleId,
@@ -198,13 +202,11 @@ export class BookingsController {
   }
 
   // =========================================
-  // ✅ APPROVE BOOKING (HOST)
+  // ✅ APPROVE BOOKING
   // =========================================
   @UseGuards(JwtGuard)
   @Patch('bookings/:id/approve')
   async approveBooking(@Param('id') id: string, @Req() req: any) {
-    const user = req.user;
-
     const booking = await this.prisma.booking.findUnique({
       where: { id },
       include: { vehicle: true },
@@ -212,7 +214,7 @@ export class BookingsController {
 
     if (!booking) throw new NotFoundException('Booking not found');
 
-    if (booking.vehicle.hostId !== user.sub) {
+    if (booking.vehicle.hostId !== req.user.sub) {
       throw new ForbiddenException('Not your vehicle');
     }
 
@@ -227,7 +229,7 @@ export class BookingsController {
   }
 
   // =========================================
-  // ❌ REJECT BOOKING (HOST)
+  // ❌ REJECT BOOKING
   // =========================================
   @UseGuards(JwtGuard)
   @Patch('bookings/:id/reject')
@@ -254,7 +256,7 @@ export class BookingsController {
   }
 
   // =========================================
-  // 🚫 CANCEL BOOKING (RENTER)
+  // 🚫 CANCEL BOOKING
   // =========================================
   @UseGuards(JwtGuard)
   @Patch('bookings/:id/cancel')

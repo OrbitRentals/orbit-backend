@@ -4,10 +4,12 @@ import { VehiclesModule } from './vehicles/vehicles.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { AdminModule } from './admin/admin.module';
+import { MessagesModule } from './messages/messages.module';
 
 @Module({
   imports: [
     AuthModule,
+    MessagesModule,
     VehiclesModule,
     PrismaModule,
     BookingsModule,
