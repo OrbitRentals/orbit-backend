@@ -11,14 +11,20 @@ import { Resend } from 'resend';
 
 @Injectable()
 export class AuthService {
-  private resend = new Resend(process.env.RESEND_API_KEY);
+  private resend: Resend | null = null;
 
   constructor(
     private prisma: PrismaService,
     private jwt: JwtService,
-  ) {}
+  ) {
+    if (!process.env.RESEND_API_KEY) {
+      console.error('❌ RESEND_API_KEY is missing in environment variables');
+    } else {
+      this.resend = new Resend(process.env.RESEND_API_KEY);
+      console.log('✅ Resend initialized');
+    }
+  }
 
-  // 📝 REGISTER
   async register(email: string, password: string) {
     if (!email || !password) {
       throw new BadRequestException('Email and password are required');
@@ -49,27 +55,21 @@ export class AuthService {
 
     const verifyUrl = `https://orbitrentals.net/verify?token=${verificationToken}`;
 
-    // 📧 SEND REAL VERIFICATION EMAIL
-    try {
+    // ✉️ SEND REAL EMAIL
+    if (this.resend) {
       await this.resend.emails.send({
-        from: 'Orbit Rentals <noreply@orbitrentals.net>',
+        from: 'Orbit Rentals <admin@orbitrentals.net>',
         to: normalizedEmail,
         subject: 'Verify your Orbit Rentals account',
         html: `
-          <h2>Welcome to Orbit Rentals 🚗</h2>
-          <p>Please verify your email to activate your account.</p>
-          <p>
-            <a href="${verifyUrl}"
-              style="display:inline-block;padding:12px 20px;background:#111;color:#fff;text-decoration:none;border-radius:6px;">
-              Verify My Account
-            </a>
-          </p>
-          <p>If you didn’t create this account, you can ignore this email.</p>
+          <h2>Welcome to Orbit Rentals</h2>
+          <p>Please verify your email:</p>
+          <a href="${verifyUrl}">${verifyUrl}</a>
         `,
       });
-    } catch (error) {
-      console.error('Resend error:', error);
-      throw new BadRequestException('Failed to send verification email');
+    } else {
+      console.log('⚠️ Email not sent. Missing Resend key.');
+      console.log('VERIFY LINK:', verifyUrl);
     }
 
     return {
@@ -78,7 +78,6 @@ export class AuthService {
     };
   }
 
-  // 🔑 LOGIN
   async login(email: string, password: string) {
     if (!email || !password) {
       throw new UnauthorizedException('Invalid credentials');
@@ -109,7 +108,6 @@ export class AuthService {
     return this.signToken(user.id, user.email, user.role);
   }
 
-  // ✅ VERIFY EMAIL
   async verifyEmail(token: string) {
     if (!token) {
       throw new BadRequestException('Verification token is required');
@@ -138,7 +136,6 @@ export class AuthService {
     };
   }
 
-  // 🔐 JWT SIGN
   private async signToken(
     userId: string,
     email: string,
